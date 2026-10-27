@@ -1,4 +1,9 @@
-import { MediaRequestStatus, MediaStatus, type TvDetails } from "./types";
+import {
+  MediaRequestStatus,
+  type MediaSeason,
+  MediaStatus,
+  type TvDetails,
+} from "./types";
 
 /** The status icon standing for each of Seerr's season badges. */
 const BADGE_STATUS: Record<SeasonBadge, MediaStatus> = {
@@ -68,20 +73,29 @@ const IN_LIBRARY = new Set([
   MediaStatus.PROCESSING,
 ]);
 
-/** Seasons already asked for and still standing, or already in the library. */
-const requestedSeasons = (details: TvDetails): Set<number> => {
-  const asked = (details.mediaInfo?.requests ?? [])
-    .filter(
-      (request) =>
-        !request.is4k &&
-        request.status !== MediaRequestStatus.DECLINED &&
-        request.status !== MediaRequestStatus.COMPLETED,
-    )
-    .flatMap((request) =>
-      (request.seasons ?? []).map((season) => season.seasonNumber),
-    );
+/** A season's library status for the tier's copy, standard or 4K. */
+const seasonStatus = (season: MediaSeason, is4k: boolean): MediaStatus =>
+  is4k ? season.status4k : season.status;
+
+/** The tier's requests that still stand: not declined, not long completed. */
+const standingRequests = (details: TvDetails, is4k: boolean) =>
+  (details.mediaInfo?.requests ?? []).filter(
+    (request) =>
+      !!request.is4k === is4k &&
+      request.status !== MediaRequestStatus.DECLINED &&
+      request.status !== MediaRequestStatus.COMPLETED,
+  );
+
+/**
+ * Seasons already asked for and still standing, or already in the library,
+ * in the tier asked about.
+ */
+const requestedSeasons = (details: TvDetails, is4k: boolean): Set<number> => {
+  const asked = standingRequests(details, is4k).flatMap((request) =>
+    (request.seasons ?? []).map((season) => season.seasonNumber),
+  );
   const inLibrary = (details.mediaInfo?.seasons ?? [])
-    .filter((season) => IN_LIBRARY.has(season.status))
+    .filter((season) => IN_LIBRARY.has(seasonStatus(season, is4k)))
     .map((season) => season.seasonNumber);
 
   return new Set([...asked, ...inLibrary]);
@@ -89,13 +103,17 @@ const requestedSeasons = (details: TvDetails): Set<number> => {
 
 /**
  * The seasons that can be requested: those with episodes, the specials only
- * when the server shows them, and none that is requested or in the library.
+ * when the server shows them, and none that is requested or in the library,
+ * in standard or, for a 4K request, in 4K.
  */
 export const unrequestedSeasons = (
   details: TvDetails,
-  { specials = false }: { specials?: boolean } = {},
+  {
+    specials = false,
+    is4k = false,
+  }: { specials?: boolean; is4k?: boolean } = {},
 ): number[] => {
-  const requested = requestedSeasons(details);
+  const requested = requestedSeasons(details, is4k);
 
   return details.seasons
     .filter(
@@ -186,18 +204,17 @@ export interface SeasonRow {
 /**
  * The rows of Seerr's season table (TvRequestModal): the seasons with
  * episodes, the specials only when the server shows them, each with the
- * badge Seerr gives it and whether it can still be chosen.
+ * badge Seerr gives it and whether it can still be chosen. A 4K request reads
+ * the 4K copy, as Seerr's 4K modal does.
  */
 export const seasonRows = (
   details: TvDetails,
-  { specials = false }: { specials?: boolean } = {},
+  {
+    specials = false,
+    is4k = false,
+  }: { specials?: boolean; is4k?: boolean } = {},
 ): SeasonRow[] => {
-  const standing = (details.mediaInfo?.requests ?? []).filter(
-    (request) =>
-      !request.is4k &&
-      request.status !== MediaRequestStatus.DECLINED &&
-      request.status !== MediaRequestStatus.COMPLETED,
-  );
+  const standing = standingRequests(details, is4k);
 
   return details.seasons
     .filter(
@@ -215,16 +232,17 @@ export const seasonRows = (
       const mediaSeason = details.mediaInfo?.seasons?.find(
         (known) =>
           known.seasonNumber === season.seasonNumber &&
-          known.status !== MediaStatus.UNKNOWN &&
-          known.status !== MediaStatus.DELETED,
+          seasonStatus(known, is4k) !== MediaStatus.UNKNOWN &&
+          seasonStatus(known, is4k) !== MediaStatus.DELETED,
       );
+      const libraryStatus = mediaSeason && seasonStatus(mediaSeason, is4k);
 
       let badge: SeasonBadge | undefined;
-      if (mediaSeason?.status === MediaStatus.AVAILABLE) badge = "available";
-      else if (mediaSeason?.status === MediaStatus.PARTIALLY_AVAILABLE)
+      if (libraryStatus === MediaStatus.AVAILABLE) badge = "available";
+      else if (libraryStatus === MediaStatus.PARTIALLY_AVAILABLE)
         badge = "partially_available";
       else if (
-        mediaSeason?.status === MediaStatus.PROCESSING ||
+        libraryStatus === MediaStatus.PROCESSING ||
         (!mediaSeason && seasonRequest?.status === MediaRequestStatus.APPROVED)
       )
         badge = "requested";

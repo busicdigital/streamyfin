@@ -172,6 +172,7 @@ export default function TVSeasonSelectModalPage() {
     details: modalState?.series,
     enabled: !!modalState,
     quotaUserId: seerrUser?.id,
+    is4k: modalState?.is4k === true,
   });
 
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -224,12 +225,14 @@ export default function TVSeasonSelectModalPage() {
       mediaType: MediaType.TV,
       tvdbId: modalState.tvdbId,
       seasons,
+      ...(modalState.is4k && { is4k: true }),
     };
 
     if (modalState.hasAdvancedRequestPermission) {
       // The advanced sheet takes this one's place rather than stacking on it.
       submission.dismiss();
       router.back();
+      // The body carries the tier on, so the advanced sheet reads 4K too.
       showRequestModal({
         requestBody: body,
         title: modalState.title,
@@ -290,7 +293,9 @@ export default function TVSeasonSelectModalPage() {
             style={styles.content}
           >
             <Text style={[styles.heading, { fontSize: typography.heading }]}>
-              {t("seerr.request_series")}
+              {modalState.is4k
+                ? t("seerr.request_series_4k")
+                : t("seerr.request_series")}
             </Text>
             <Text style={[styles.subtitle, { fontSize: typography.callout }]}>
               {modalState.title}

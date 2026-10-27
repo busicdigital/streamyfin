@@ -1095,6 +1095,8 @@
     "report_issue_button": "Report issue",
     "request_button": "Request",
     "request_more": "Request more",
+    "request_4k": "Request in 4K",
+    "request_more_4k": "Request more in 4K",
     "request_status": {
       "available": "Available",
       "partially_available": "Partially available",
@@ -1160,6 +1162,7 @@
       "failed_to_decline_request": "Failed to decline request"
     },
     "request_series": "Request series",
+    "request_series_4k": "Request series in 4K",
     "request_approved_automatically": "This request will be approved automatically.",
     "request_n_seasons_one": "Request {{count}} season",
     "request_n_seasons_other": "Request {{count}} seasons",

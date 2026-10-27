@@ -107,9 +107,15 @@ const MobilePage: React.FC = () => {
     },
   });
 
-  // Request, or Seerr's Request more on a series it knows with seasons left.
-  const { hasAdvancedRequestPermission, requestMore, offersRequest } =
-    useSeerrRequestOffer(details, mediaType);
+  // Request, or Seerr's Request more on a series it knows with seasons left,
+  // and the same in 4K beside it.
+  const {
+    hasAdvancedRequestPermission,
+    requestMore,
+    offersRequest,
+    requestMore4k,
+    offersRequest4k,
+  } = useSeerrRequestOffer(details, mediaType);
 
   const canManageRequests = useMemo(() => {
     if (!seerrUser) return false;
@@ -204,32 +210,37 @@ const MobilePage: React.FC = () => {
     [requestBody, _setRequestBody, advancedReqModalRef],
   );
 
-  const request = useCallback(async () => {
-    const body: MediaRequestBody = {
-      mediaId: Number(result.id!),
-      mediaType: mediaType!,
-      // TMDB sends null for a show it has no TVDB id for, and the request
-      // schema takes a number or nothing.
-      tvdbId: details?.externalIds?.tvdbId ?? undefined,
-      // A series opens Seerr's season table with nothing chosen yet.
-      ...(mediaType === MediaType.TV && { seasons: [] }),
-    };
+  const request = useCallback(
+    async (is4k: boolean) => {
+      const body: MediaRequestBody = {
+        mediaId: Number(result.id!),
+        mediaType: mediaType!,
+        // TMDB sends null for a show it has no TVDB id for, and the request
+        // schema takes a number or nothing.
+        tvdbId: details?.externalIds?.tvdbId ?? undefined,
+        // A series opens Seerr's season table with nothing chosen yet.
+        ...(mediaType === MediaType.TV && { seasons: [] }),
+        // Seerr sends it to the default 4K server.
+        ...(is4k && { is4k: true }),
+      };
 
-    if (hasAdvancedRequestPermission || mediaType === MediaType.TV) {
-      setRequestBody(body);
-      return;
-    }
+      if (hasAdvancedRequestPermission || mediaType === MediaType.TV) {
+        setRequestBody(body);
+        return;
+      }
 
-    requestMedia(mediaTitle, body, refetch);
-  }, [
-    details,
-    result,
-    requestMedia,
-    hasAdvancedRequestPermission,
-    mediaTitle,
-    refetch,
-    mediaType,
-  ]);
+      requestMedia(mediaTitle, body, refetch);
+    },
+    [
+      details,
+      result,
+      requestMedia,
+      hasAdvancedRequestPermission,
+      mediaTitle,
+      refetch,
+      mediaType,
+    ],
+  );
 
   const isAnime = useMemo(
     () =>
@@ -396,7 +407,7 @@ const MobilePage: React.FC = () => {
                       <Button
                         color='purple'
                         className='flex-1'
-                        onPress={request}
+                        onPress={() => request(false)}
                         iconLeft={<SeerrRequestIcon />}
                       >
                         {/* Play's size, beside it. */}
@@ -433,6 +444,22 @@ const MobilePage: React.FC = () => {
                   </View>
                 )
               )}
+              {/* Seerr's Request in 4K, kept apart from the standard request
+                  as Seerr keeps the two copies apart (RequestButton). */}
+              {!isLoading && !isFetching && offersRequest4k && (
+                <Button
+                  color='purple'
+                  className={jellyfinMediaId || offersRequest ? "mt-2" : "mt-4"}
+                  onPress={() => request(true)}
+                  iconLeft={<SeerrRequestIcon />}
+                >
+                  <Text className='text-sm'>
+                    {requestMore4k
+                      ? t("seerr.request_more_4k")
+                      : t("seerr.request_4k")}
+                  </Text>
+                </Button>
+              )}
               {/* Kept mounted while the details refetch, as after a request: remounted, it
                   would read the person's choices and titles again. */}
               {!isLoading && (
@@ -440,7 +467,11 @@ const MobilePage: React.FC = () => {
                   details={details}
                   mediaType={mediaType}
                   seerrUserId={seerrUser?.id}
-                  className={jellyfinMediaId || offersRequest ? "mt-2" : "mt-4"}
+                  className={
+                    jellyfinMediaId || offersRequest || offersRequest4k
+                      ? "mt-2"
+                      : "mt-4"
+                  }
                 />
               )}
               {canManageRequests && pendingRequest && (

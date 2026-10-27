@@ -142,4 +142,11 @@ describe("useSeerrSeasonRequest", () => {
     const { result } = await render({ opened: { seasons: "all" } });
     await waitFor(() => expect(result.current.selected).toEqual([2]));
   });
+
+  // The first season is asked for in standard only, so a 4K request can
+  // still take it.
+  test("offers the seasons left in 4K for a 4K request", async () => {
+    const { result } = await render({ is4k: true });
+    await waitFor(() => expect(result.current.unrequested).toEqual([1, 2]));
+  });
 });

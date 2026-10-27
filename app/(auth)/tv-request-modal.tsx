@@ -21,7 +21,7 @@ import { useScaledTVTypography } from "@/constants/TVTypography";
 import useRouter from "@/hooks/useAppRouter";
 import { useSeerr } from "@/hooks/useSeerr";
 import { tvRequestModalAtom } from "@/utils/atoms/tvRequestModal";
-import { canRequestForOthers } from "@/utils/seerr/requests";
+import { canRequestForOthers, defaultServerFor } from "@/utils/seerr/requests";
 import type {
   MediaRequestBody,
   QualityProfile,
@@ -100,9 +100,11 @@ export default function TVRequestModalPage() {
     enabled: forOthers && !!seerrApi && !!seerrUser && !!modalState,
   });
 
+  // The tier rides with the request the sheet was opened with.
+  const is4k = modalState?.requestBody.is4k === true;
   const defaultService = useMemo(
-    () => serviceSettings?.find?.((v) => v.isDefault),
-    [serviceSettings],
+    () => defaultServerFor(serviceSettings, is4k),
+    [serviceSettings, is4k],
   );
 
   const { data: defaultServiceDetails } = useQuery({
@@ -348,7 +350,7 @@ export default function TVRequestModalPage() {
             style={styles.content}
           >
             <Text style={[styles.heading, { fontSize: typography.heading }]}>
-              {t("seerr.advanced")}
+              {is4k ? t("seerr.request_4k") : t("seerr.advanced")}
             </Text>
             <Text style={[styles.subtitle, { fontSize: typography.callout }]}>
               {modalState.title}

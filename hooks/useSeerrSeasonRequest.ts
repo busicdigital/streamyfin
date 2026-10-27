@@ -27,6 +27,7 @@ export const useSeerrSeasonRequest = ({
   enabled,
   opened,
   quotaUserId,
+  is4k = false,
 }: {
   details?: TvDetails;
   /** False for a film: nothing to choose. */
@@ -38,6 +39,8 @@ export const useSeerrSeasonRequest = ({
   opened?: { seasons?: number[] | "all" };
   /** Whose quota counts: the user's own, or the one picked in Request as. */
   quotaUserId?: number;
+  /** A request for the 4K copy, whose seasons stand apart from standard's. */
+  is4k?: boolean;
 }) => {
   const { t } = useTranslation();
   const { seerrApi, seerrUser } = useSeerr();
@@ -49,12 +52,13 @@ export const useSeerrSeasonRequest = ({
   const partial = publicSettings?.partialRequestsEnabled !== false;
 
   const rows = useMemo(
-    () => (enabled && details ? seasonRows(details, { specials }) : []),
-    [enabled, details, specials],
+    () => (enabled && details ? seasonRows(details, { specials, is4k }) : []),
+    [enabled, details, specials, is4k],
   );
   const unrequested = useMemo(
-    () => (enabled && details ? unrequestedSeasons(details, { specials }) : []),
-    [enabled, details, specials],
+    () =>
+      enabled && details ? unrequestedSeasons(details, { specials, is4k }) : [],
+    [enabled, details, specials, is4k],
   );
   const [selected, setSelected] = useState<number[]>([]);
 
@@ -112,12 +116,19 @@ export const useSeerrSeasonRequest = ({
       enabled &&
       unrequested.length > 0 &&
       !overLimit &&
+      // A 4K request takes the 4K approval permissions, as on Seerr.
       hasPermission(
-        [
-          Permission.MANAGE_REQUESTS,
-          Permission.AUTO_APPROVE,
-          Permission.AUTO_APPROVE_TV,
-        ],
+        is4k
+          ? [
+              Permission.MANAGE_REQUESTS,
+              Permission.AUTO_APPROVE_4K,
+              Permission.AUTO_APPROVE_4K_TV,
+            ]
+          : [
+              Permission.MANAGE_REQUESTS,
+              Permission.AUTO_APPROVE,
+              Permission.AUTO_APPROVE_TV,
+            ],
         seerrUser?.permissions ?? 0,
         { type: "or" },
       ),

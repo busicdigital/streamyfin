@@ -8,6 +8,8 @@ export type TVSeasonSelectModalState = {
   mediaId: number;
   tvdbId?: number;
   hasAdvancedRequestPermission: boolean;
+  /** A request for the 4K copy, whose seasons stand apart from standard's. */
+  is4k?: boolean;
   onRequested: () => void;
 } | null;
 

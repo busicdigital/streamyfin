@@ -556,6 +556,10 @@ export type PublicSettings = Schemas["PublicSettings"] & {
   enableSpecialEpisodes?: boolean;
   /** Whether a series can be requested a season at a time. */
   partialRequestsEnabled?: boolean;
+  /** Whether a default 4K Radarr is set up, so films can be asked for in 4K. */
+  movie4kEnabled?: boolean;
+  /** Whether a default 4K Sonarr is set up, so series can be asked for in 4K. */
+  series4kEnabled?: boolean;
 };
 
 /** A user's quotas for films and for series. `remaining` only comes with a limit. */

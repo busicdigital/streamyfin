@@ -221,9 +221,15 @@ export const TVSeerrPage: React.FC = () => {
   const mediaTitle = getTitle(details) || titleParam;
   const releaseYear = getYear(details) || yearParam;
 
-  // Request, or Seerr's Request more, by the phone's own rule.
-  const { hasAdvancedRequestPermission, requestMore, offersRequest } =
-    useSeerrRequestOffer(details, mediaType);
+  // Request, or Seerr's Request more, by the phone's own rule, and the same
+  // in 4K beside it.
+  const {
+    hasAdvancedRequestPermission,
+    requestMore,
+    offersRequest,
+    requestMore4k,
+    offersRequest4k,
+  } = useSeerrRequestOffer(details, mediaType);
 
   const canManageRequests = useMemo(() => {
     if (!seerrUser) return false;
@@ -295,59 +301,68 @@ export const TVSeerrPage: React.FC = () => {
     }
   }, [seerrApi, pendingRequest, refetch, refreshAfterRequest, t]);
 
-  const handleRequest = useCallback(async () => {
-    const body: MediaRequestBody = {
-      mediaId: Number(result.id!),
-      mediaType: mediaType!,
-      tvdbId: details?.externalIds?.tvdbId ?? undefined,
-      ...(mediaType === MediaType.TV && {
-        seasons: (details as TvDetails)?.seasons
-          ?.filter?.((s) => s.seasonNumber !== 0)
-          ?.map?.((s) => s.seasonNumber),
-      }),
-    };
-
-    if (hasAdvancedRequestPermission) {
-      showRequestModal({
-        requestBody: body,
-        title: mediaTitle,
-        id: result.id!,
+  const handleRequest = useCallback(
+    async (is4k: boolean) => {
+      const body: MediaRequestBody = {
+        mediaId: Number(result.id!),
         mediaType: mediaType!,
+        tvdbId: details?.externalIds?.tvdbId ?? undefined,
+        ...(mediaType === MediaType.TV && {
+          seasons: (details as TvDetails)?.seasons
+            ?.filter?.((s) => s.seasonNumber !== 0)
+            ?.map?.((s) => s.seasonNumber),
+        }),
+        // Seerr sends it to the default 4K server.
+        ...(is4k && { is4k: true }),
+      };
+
+      if (hasAdvancedRequestPermission) {
+        showRequestModal({
+          requestBody: body,
+          title: mediaTitle,
+          id: result.id!,
+          mediaType: mediaType!,
+          onRequested: refetch,
+        });
+        return;
+      }
+
+      requestMedia(mediaTitle, body, refetch);
+    },
+    [
+      details,
+      result,
+      requestMedia,
+      hasAdvancedRequestPermission,
+      mediaTitle,
+      refetch,
+      mediaType,
+      showRequestModal,
+    ],
+  );
+
+  const handleOpenSeasonSelectModal = useCallback(
+    (is4k: boolean) => {
+      if (!details) return;
+      showSeasonSelectModal({
+        series: details as TvDetails,
+        title: mediaTitle,
+        mediaId: Number(result.id!),
+        tvdbId: details?.externalIds?.tvdbId ?? undefined,
+        hasAdvancedRequestPermission,
+        is4k,
         onRequested: refetch,
       });
-      return;
-    }
-
-    requestMedia(mediaTitle, body, refetch);
-  }, [
-    details,
-    result,
-    requestMedia,
-    hasAdvancedRequestPermission,
-    mediaTitle,
-    refetch,
-    mediaType,
-    showRequestModal,
-  ]);
-
-  const handleOpenSeasonSelectModal = useCallback(() => {
-    if (!details) return;
-    showSeasonSelectModal({
-      series: details as TvDetails,
-      title: mediaTitle,
-      mediaId: Number(result.id!),
-      tvdbId: details?.externalIds?.tvdbId ?? undefined,
+    },
+    [
+      mediaTitle,
+      result,
+      details,
       hasAdvancedRequestPermission,
-      onRequested: refetch,
-    });
-  }, [
-    mediaTitle,
-    result,
-    details,
-    hasAdvancedRequestPermission,
-    refetch,
-    showSeasonSelectModal,
-  ]);
+      refetch,
+      showSeasonSelectModal,
+    ],
+  );
 
   // A season's own request, as the phone's "+" beside it (SeerrSeasons).
   const handleRequestSeason = useCallback(
@@ -652,14 +667,15 @@ export const TVSeerrPage: React.FC = () => {
                 </TVButton>
               )}
 
-              {/* Seerr's one request button (RequestButton), as on the phone:
-                  a series picks its seasons in the season sheet. */}
+              {/* Seerr's request buttons (RequestButton), as on the phone: a
+                  series picks its seasons in the season sheet. The 4K one
+                  stands beside the standard one. */}
               {offersRequest && (
                 <TVButton
-                  onPress={
+                  onPress={() =>
                     mediaType === MediaType.TV
-                      ? handleOpenSeasonSelectModal
-                      : handleRequest
+                      ? handleOpenSeasonSelectModal(false)
+                      : handleRequest(false)
                   }
                   variant='secondary'
                   hasTVPreferredFocus={!hasJellyfinMedia}
@@ -679,6 +695,41 @@ export const TVSeerrPage: React.FC = () => {
                     {requestMore
                       ? t("seerr.request_more")
                       : t("seerr.request_button")}
+                  </Text>
+                </TVButton>
+              )}
+
+              {offersRequest4k && (
+                <TVButton
+                  onPress={() =>
+                    mediaType === MediaType.TV
+                      ? handleOpenSeasonSelectModal(true)
+                      : handleRequest(true)
+                  }
+                  variant='secondary'
+                  // The first button when it is the only way in: no Play,
+                  // no standard request.
+                  hasTVPreferredFocus={!hasJellyfinMedia && !offersRequest}
+                  refSetter={
+                    !hasJellyfinMedia && !offersRequest
+                      ? setPlayButtonRef
+                      : undefined
+                  }
+                  scaleAmount={1.01}
+                >
+                  <View style={{ marginRight: 8 }}>
+                    <SeerrRequestIcon size={24} color='#FFFFFF' />
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: typography.callout,
+                      fontWeight: "bold",
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    {requestMore4k
+                      ? t("seerr.request_more_4k")
+                      : t("seerr.request_4k")}
                   </Text>
                 </TVButton>
               )}

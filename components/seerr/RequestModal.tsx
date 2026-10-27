@@ -6,7 +6,7 @@ import {
 } from "@gorhom/bottom-sheet";
 import type { BottomSheetModalMethods } from "@gorhom/bottom-sheet/lib/typescript/types";
 import { useQuery } from "@tanstack/react-query";
-import { forwardRef, useCallback, useMemo, useState } from "react";
+import { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Pressable,
@@ -24,7 +24,7 @@ import { SHEET_MAX_HEIGHT_RATIO } from "@/constants/Values";
 import { useSeerr } from "@/hooks/useSeerr";
 import { useSeerrSeasonRequest } from "@/hooks/useSeerrSeasonRequest";
 import { writeDebugLog } from "@/utils/log";
-import { canRequestForOthers } from "@/utils/seerr/requests";
+import { canRequestForOthers, defaultServerFor } from "@/utils/seerr/requests";
 import type {
   MediaRequestBody,
   MediaType,
@@ -40,7 +40,6 @@ interface Props {
   requestBody?: MediaRequestBody;
   type: MediaType;
   isAnime?: boolean;
-  is4k?: boolean;
   /** A series' details: its seasons are chosen here, as on Seerr. */
   details?: TvDetails;
   /** Whether the user may pick the server, profile, folder, tags and user. */
@@ -70,6 +69,8 @@ const RequestModal = forwardRef<
     const { seerrApi, seerrUser, requestMedia } = useSeerr();
     const { height: windowHeight } = useWindowDimensions();
     const isSeries = type === "tv" && !!details;
+    // The tier rides with the request the sheet opens with, as on the TV.
+    const is4k = requestBody?.is4k === true;
     // No user named until one is picked: Seerr refuses a request naming one,
     // even the caller's own, from anyone who may not request for others.
     const [requestOverrides, setRequestOverrides] = useState<MediaRequestBody>({
@@ -110,6 +111,7 @@ const RequestModal = forwardRef<
       details,
       enabled: isSeries,
       opened: requestBody,
+      is4k,
       // The quota of whoever the request is for. Someone else's is read under
       // the same two permissions as requesting for them, so only a user who
       // may pick someone else reads it; for anyone else it would be a 403.
@@ -143,9 +145,19 @@ const RequestModal = forwardRef<
     });
 
     const defaultService = useMemo(
-      () => serviceSettings?.find?.((v) => v.isDefault),
-      [serviceSettings],
+      () => defaultServerFor(serviceSettings, is4k),
+      [serviceSettings, is4k],
     );
+
+    // A profile, folder or tags picked on one server mean nothing on the
+    // other tier's: the sheet starts over on the default server of its tier.
+    useEffect(() => {
+      setRequestOverrides({
+        mediaId: Number(id),
+        mediaType: type,
+        serverId: defaultService?.id,
+      });
+    }, [defaultService?.id, id, type]);
 
     const { data: defaultServiceDetails } = useQuery({
       queryKey: [
@@ -156,16 +168,11 @@ const RequestModal = forwardRef<
         "details",
         defaultService?.id,
       ],
-      queryFn: async () => {
-        setRequestOverrides((prev) => ({
-          ...prev,
-          serverId: defaultService?.id,
-        }));
-        return seerrApi?.serviceDetails(
+      queryFn: async () =>
+        seerrApi?.serviceDetails(
           type === "movie" ? "radarr" : "sonarr",
           defaultService!.id,
-        );
-      },
+        ),
       enabled: advanced && !!seerrApi && !!seerrUser && !!defaultService,
       refetchOnMount: "always",
     });
@@ -411,7 +418,13 @@ const RequestModal = forwardRef<
             >
               <View style={{ flex: 1 }}>
                 <Text className='font-bold text-2xl text-neutral-100'>
-                  {isSeries ? t("seerr.request_series") : t("seerr.advanced")}
+                  {isSeries
+                    ? is4k
+                      ? t("seerr.request_series_4k")
+                      : t("seerr.request_series")
+                    : is4k
+                      ? t("seerr.request_4k")
+                      : t("seerr.advanced")}
                 </Text>
                 {isSeries ? (
                   <Text className='text-neutral-300' style={{ marginTop: 2 }}>

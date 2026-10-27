@@ -257,6 +257,36 @@ describe("unrequestedSeasons", () => {
     );
     expect(unrequestedSeasons(details)).toEqual([1, 2]);
   });
+
+  describe("in 4K", () => {
+    test("ignores standard requests and the standard library", () => {
+      const details = show(
+        media({
+          seasons: [librarySeason(1, MediaStatus.AVAILABLE)],
+          requests: [request([[2, MediaRequestStatus.PENDING]])],
+        }),
+      );
+      expect(unrequestedSeasons(details, { is4k: true })).toEqual([1, 2]);
+    });
+
+    test("leaves out what is requested or in the library in 4K", () => {
+      const details = show(
+        media({
+          seasons: [
+            {
+              ...librarySeason(1, MediaStatus.UNKNOWN),
+              status4k: MediaStatus.AVAILABLE,
+            },
+          ],
+          requests: [
+            { ...request([[2, MediaRequestStatus.PENDING]]), is4k: true },
+          ],
+        }),
+      );
+      expect(unrequestedSeasons(details, { is4k: true })).toEqual([]);
+      expect(unrequestedSeasons(details)).toEqual([1, 2]);
+    });
+  });
 });
 
 describe("toggleSeason", () => {
@@ -446,6 +476,33 @@ describe("seasonRows", () => {
       locked: false,
     });
     expect(rowOf(details, 2)).toMatchObject({
+      badge: "not_requested",
+      locked: false,
+    });
+  });
+
+  // The 4K sheet draws the 4K copy: a season the library has in standard
+  // only is free to ask for in 4K, as on Seerr's own 4K modal.
+  test("reads the 4K library and 4K requests for a 4K request", () => {
+    const details = show(
+      media({
+        seasons: [
+          {
+            ...librarySeason(1, MediaStatus.AVAILABLE),
+            status4k: MediaStatus.PARTIALLY_AVAILABLE,
+          },
+          librarySeason(2, MediaStatus.AVAILABLE),
+        ],
+        requests: [request([[2, MediaRequestStatus.PENDING]])],
+      }),
+    );
+    const rows4k = seasonRows(details, { is4k: true });
+
+    expect(rows4k.find((r) => r.seasonNumber === 1)).toMatchObject({
+      badge: "partially_available",
+      locked: true,
+    });
+    expect(rows4k.find((r) => r.seasonNumber === 2)).toMatchObject({
       badge: "not_requested",
       locked: false,
     });
